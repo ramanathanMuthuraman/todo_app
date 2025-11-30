@@ -1,7 +1,38 @@
 import 'package:flutter/material.dart';
 
-class TodoScreen extends StatelessWidget {
+class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
+
+  @override
+  State<TodoScreen> createState() => _TodoScreenState();
+}
+
+class _TodoItem {
+  final String title;
+  final String dayLabel;
+  final String timeLabel;
+  bool isDone;
+
+  _TodoItem({
+    required this.title,
+    required this.dayLabel,
+    required this.timeLabel,
+    this.isDone = false,
+  });
+}
+
+class _TodoScreenState extends State<TodoScreen> {
+  final List<_TodoItem> _todos = [
+    _TodoItem(title: "Buy groceries", dayLabel: "Today", timeLabel: "6 PM"),
+    _TodoItem(title: "Finish Flutter UI", dayLabel: "Today", timeLabel: "8 PM"),
+    _TodoItem(title: "Read a book", dayLabel: "Tomorrow", timeLabel: "9 PM"),
+  ];
+  final TextEditingController _taskController = TextEditingController();
+  @override
+  void dispose() {
+    _taskController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +57,7 @@ class TodoScreen extends StatelessWidget {
                     // Text Input Box (takes remaining space)
                     Expanded(
                       child: TextField(
+                        controller: _taskController,
                         decoration: InputDecoration(
                           hintText: "Add a new task",
                           border: OutlineInputBorder(
@@ -49,8 +81,20 @@ class TodoScreen extends StatelessWidget {
                       child: IconButton(
                         icon: const Icon(Icons.add, color: Colors.white),
                         onPressed: () {
-                          // For Day 1: No functionality yet
-                          print("Add pressed");
+                          final text = _taskController.text.trim();
+                          if (text.isEmpty) return;
+
+                          setState(() {
+                            _todos.add(
+                              _TodoItem(
+                                title: text,
+                                dayLabel: "Today",
+                                timeLabel: "6 PM",
+                              ),
+                            );
+                          });
+
+                          _taskController.clear();
                         },
                       ),
                     ),
@@ -61,24 +105,45 @@ class TodoScreen extends StatelessWidget {
               Expanded(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
-                  child: ListView(
-                    children: const [
-                      _TodoListItem(
-                        title: "Buy groceries",
-                        dayLabel: "Today",
-                        timeLabel: "6 PM",
-                      ),
-                      _TodoListItem(
-                        title: "Finish Flutter UI",
-                        dayLabel: "Today",
-                        timeLabel: "8 PM",
-                      ),
-                      _TodoListItem(
-                        title: "Read a book",
-                        dayLabel: "Tomorrow",
-                        timeLabel: "9 PM",
-                      ),
-                    ],
+                  child: ListView.builder(
+                    itemCount: _todos.length,
+                    itemBuilder: (context, index) {
+                      final item = _todos[index];
+                      return Dismissible(
+                        key: ValueKey(item.title), // ok for now
+                        direction:
+                            DismissDirection.endToStart, // swipe right → left
+                        onDismissed: (direction) {
+                          // store title before removing
+                          final removedTitle = item.title;
+
+                          setState(() {
+                            _todos.removeAt(index);
+                          });
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('$removedTitle deleted')),
+                          );
+                        },
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          color: Colors.red,
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        child: _TodoListItem(
+                          title: item.title,
+                          dayLabel: item.dayLabel,
+                          timeLabel: item.timeLabel,
+                          isDone: item.isDone,
+                          onToggle: () {
+                            setState(() {
+                              item.isDone = !item.isDone;
+                            });
+                          },
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -94,23 +159,43 @@ class _TodoListItem extends StatelessWidget {
   final String title;
   final String dayLabel;
   final String timeLabel;
+  final bool isDone;
+  final VoidCallback onToggle;
 
   const _TodoListItem({
     super.key,
     required this.title,
     required this.dayLabel,
     required this.timeLabel,
+    required this.isDone,
+    required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.check_box_outline_blank),
-      title: Text(title),
+      leading: IconButton(
+        icon: Icon(
+          isDone ? Icons.check_box : Icons.check_box_outline_blank,
+          color: Colors.blue,
+        ),
+        onPressed: onToggle,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          decoration: isDone ? TextDecoration.lineThrough : null,
+          color: isDone ? Colors.grey : Colors.black,
+          fontSize: 18,
+        ),
+      ),
       subtitle: Row(
         children: [
-          Text(dayLabel),
+          Text(
+            dayLabel,
+            style: TextStyle(color: isDone ? Colors.grey : Colors.black54),
+          ),
           const SizedBox(width: 6),
           const Icon(Icons.access_time, size: 16),
           const SizedBox(width: 6),
