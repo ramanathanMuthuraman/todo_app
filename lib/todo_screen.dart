@@ -139,6 +139,10 @@ class _TodoScreenState extends State<TodoScreen> {
                           onToggle: () {
                             setState(() {
                               item.isDone = !item.isDone;
+                              _todos.sort((a, b) {
+                                if (a.isDone == b.isDone) return 0;
+                                return a.isDone ? 1 : -1;
+                              });
                             });
                           },
                         ),
