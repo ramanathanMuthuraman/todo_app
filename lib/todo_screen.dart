@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TodoScreen extends StatefulWidget {
@@ -11,8 +12,8 @@ class TodoScreen extends StatefulWidget {
 
 class _TodoItem {
   String title;
-  final String dayLabel;
-  final String timeLabel;
+  String dayLabel;
+  String timeLabel;
   bool isDone;
 
   _TodoItem({
@@ -108,6 +109,9 @@ class _TodoScreenState extends State<TodoScreen> {
   void _openEditBottomSheet(_TodoItem item) {
     final controller = TextEditingController(text: item.title);
 
+    String tempDayLabel = item.dayLabel;
+    String tempTimeLabel = item.timeLabel;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, // so it can move up with keyboard
@@ -115,61 +119,120 @@ class _TodoScreenState extends State<TodoScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom:
-                MediaQuery.of(context).viewInsets.bottom + 16, // keyboard-safe
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Edit task",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> _pickDate() async {
+              final now = DateTime.now();
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: now,
+                firstDate: DateTime(now.year - 1),
+                lastDate: DateTime(now.year + 2),
+              );
+
+              if (picked != null) {
+                final formatted = formatDate(picked);
+                setModalState(() {
+                  tempDayLabel = formatted;
+                });
+              }
+            }
+
+            Future<void> _pickTime() async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+
+              if (picked != null) {
+                final formatted = formatTime(picked);
+                setModalState(() {
+                  tempTimeLabel = formatted;
+                });
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom:
+                    MediaQuery.of(context).viewInsets.bottom +
+                    16, // keyboard-safe
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: "Task title",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // close sheet
-                    },
-                    child: const Text("Cancel"),
+                  const Text(
+                    "Edit task",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      final newText = controller.text.trim();
-                      if (newText.isEmpty) {
-                        Navigator.of(context).pop();
-                        return;
-                      }
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: "Task title",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  Text(
+                    "Due: $tempDayLabel • $tempTimeLabel",
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _pickDate,
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: const Text("Pick date"),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: _pickTime,
+                        icon: const Icon(Icons.access_time, size: 18),
+                        label: const Text("Pick time"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // close sheet
+                        },
+                        child: const Text("Cancel"),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final newText = controller.text.trim();
+                          if (newText.isEmpty) {
+                            Navigator.of(context).pop();
+                            return;
+                          }
 
-                      setState(() {
-                        item.title = newText;
-                      });
+                          setState(() {
+                            item.title = newText;
+                            item.dayLabel = tempDayLabel;
+                            item.timeLabel = tempTimeLabel;
+                          });
 
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("Save"),
+                          await _saveTodos();
+
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text("Save"),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -189,9 +252,6 @@ class _TodoScreenState extends State<TodoScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Today'),
-              Text(DateTime.now().toString()),
-              const SizedBox(height: 10.0),
               Center(
                 child: Row(
                   children: [
@@ -359,4 +419,22 @@ class _TodoListItem extends StatelessWidget {
       ),
     );
   }
+}
+
+String formatDate(DateTime date) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final tomorrow = today.add(const Duration(days: 1));
+  final pickedDate = DateTime(date.year, date.month, date.day);
+
+  if (pickedDate == today) return "Today";
+  if (pickedDate == tomorrow) return "Tomorrow";
+
+  return DateFormat('E, MMM d').format(date); // Example: Mon, Feb 12
+}
+
+String formatTime(TimeOfDay time) {
+  final now = DateTime.now();
+  final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+  return DateFormat('h:mm a').format(dt); // 6:30 PM
 }
