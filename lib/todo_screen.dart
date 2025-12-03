@@ -12,22 +12,15 @@ class TodoScreen extends StatefulWidget {
 
 class _TodoItem {
   String title;
-  String dayLabel;
-  String timeLabel;
+  DateTime dueDate;
   bool isDone;
 
-  _TodoItem({
-    required this.title,
-    required this.dayLabel,
-    required this.timeLabel,
-    this.isDone = false,
-  });
+  _TodoItem({required this.title, required this.dueDate, this.isDone = false});
 
   Map<String, dynamic> toMap() {
     return {
       'title': title,
-      'dayLabel': dayLabel,
-      'timeLabel': timeLabel,
+      'dueDate': dueDate.toIso8601String(),
       'isDone': isDone,
     };
   }
@@ -35,8 +28,7 @@ class _TodoItem {
   factory _TodoItem.fromMap(Map<String, dynamic> map) {
     return _TodoItem(
       title: map['title'] as String,
-      dayLabel: map['dayLabel'] as String,
-      timeLabel: map['timeLabel'] as String,
+      dueDate: DateTime.parse(map['dueDate'] as String),
       isDone: map['isDone'] as bool,
     );
   }
@@ -57,32 +49,23 @@ class _TodoScreenState extends State<TodoScreen> {
     _loadTodos();
   }
 
+  void _sortTodos() {
+    _todos.sort((a, b) {
+      // Pending first
+      if (a.isDone != b.isDone) {
+        return a.isDone ? 1 : -1;
+      }
+
+      // Within pending or completed → sort by due date
+      return a.dueDate.compareTo(b.dueDate);
+    });
+  }
+
   Future<void> _loadTodos() async {
     final prefs = await SharedPreferences.getInstance();
     final jsonString = prefs.getString('todos_v1');
 
     if (jsonString == null) {
-      // optional initial sample data for first run
-      setState(() {
-        _todos.addAll([
-          _TodoItem(
-            title: "Buy groceries",
-            dayLabel: "Today",
-            timeLabel: "6 PM",
-          ),
-          _TodoItem(
-            title: "Finish Flutter UI",
-            dayLabel: "Today",
-            timeLabel: "8 PM",
-          ),
-          _TodoItem(
-            title: "Read a book",
-            dayLabel: "Tomorrow",
-            timeLabel: "9 PM",
-          ),
-        ]);
-      });
-      await _saveTodos();
       return;
     }
 
@@ -96,6 +79,7 @@ class _TodoScreenState extends State<TodoScreen> {
       _todos
         ..clear()
         ..addAll(loaded);
+      _sortTodos();
     });
   }
 
@@ -109,8 +93,7 @@ class _TodoScreenState extends State<TodoScreen> {
   void _openEditBottomSheet(_TodoItem item) {
     final controller = TextEditingController(text: item.title);
 
-    String tempDayLabel = item.dayLabel;
-    String tempTimeLabel = item.timeLabel;
+    DateTime tempDueDate = item.dueDate;
 
     showModalBottomSheet(
       context: context,
@@ -125,15 +108,20 @@ class _TodoScreenState extends State<TodoScreen> {
               final now = DateTime.now();
               final picked = await showDatePicker(
                 context: context,
-                initialDate: now,
+                initialDate: tempDueDate,
                 firstDate: DateTime(now.year - 1),
                 lastDate: DateTime(now.year + 2),
               );
 
               if (picked != null) {
-                final formatted = formatDate(picked);
                 setModalState(() {
-                  tempDayLabel = formatted;
+                  tempDueDate = DateTime(
+                    picked.year,
+                    picked.month,
+                    picked.day,
+                    tempDueDate.hour,
+                    tempDueDate.minute,
+                  );
                 });
               }
             }
@@ -141,13 +129,18 @@ class _TodoScreenState extends State<TodoScreen> {
             Future<void> _pickTime() async {
               final picked = await showTimePicker(
                 context: context,
-                initialTime: TimeOfDay.now(),
+                initialTime: TimeOfDay.fromDateTime(tempDueDate),
               );
 
               if (picked != null) {
-                final formatted = formatTime(picked);
                 setModalState(() {
-                  tempTimeLabel = formatted;
+                  tempDueDate = DateTime(
+                    tempDueDate.year,
+                    tempDueDate.month,
+                    tempDueDate.day,
+                    picked.hour,
+                    picked.minute,
+                  );
                 });
               }
             }
@@ -178,7 +171,7 @@ class _TodoScreenState extends State<TodoScreen> {
                     ),
                   ),
                   Text(
-                    "Due: $tempDayLabel • $tempTimeLabel",
+                    "Due: ${formatDate(tempDueDate)} • ${formatTime(tempDueDate)}",
                     style: const TextStyle(color: Colors.grey),
                   ),
                   Row(
@@ -217,8 +210,8 @@ class _TodoScreenState extends State<TodoScreen> {
 
                           setState(() {
                             item.title = newText;
-                            item.dayLabel = tempDayLabel;
-                            item.timeLabel = tempTimeLabel;
+                            item.dueDate = tempDueDate;
+                            _sortTodos();
                           });
 
                           await _saveTodos();
@@ -287,12 +280,9 @@ class _TodoScreenState extends State<TodoScreen> {
 
                           setState(() {
                             _todos.add(
-                              _TodoItem(
-                                title: text,
-                                dayLabel: "Today",
-                                timeLabel: "6 PM",
-                              ),
+                              _TodoItem(title: text, dueDate: DateTime.now()),
                             );
+                            _sortTodos();
                           });
 
                           _taskController.clear();
@@ -336,17 +326,13 @@ class _TodoScreenState extends State<TodoScreen> {
                         ),
                         child: _TodoListItem(
                           title: item.title,
-                          dayLabel: item.dayLabel,
-                          timeLabel: item.timeLabel,
+                          dueDate: item.dueDate,
                           isDone: item.isDone,
                           onEdit: () => _openEditBottomSheet(item),
                           onToggle: () async {
                             setState(() {
                               item.isDone = !item.isDone;
-                              _todos.sort((a, b) {
-                                if (a.isDone == b.isDone) return 0;
-                                return a.isDone ? 1 : -1;
-                              });
+                              _sortTodos();
                             });
                             await _saveTodos();
                           },
@@ -366,8 +352,7 @@ class _TodoScreenState extends State<TodoScreen> {
 
 class _TodoListItem extends StatelessWidget {
   final String title;
-  final String dayLabel;
-  final String timeLabel;
+  final DateTime dueDate;
   final bool isDone;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
@@ -375,8 +360,7 @@ class _TodoListItem extends StatelessWidget {
   const _TodoListItem({
     super.key,
     required this.title,
-    required this.dayLabel,
-    required this.timeLabel,
+    required this.dueDate,
     required this.isDone,
     required this.onToggle,
     required this.onEdit,
@@ -401,18 +385,7 @@ class _TodoListItem extends StatelessWidget {
           fontSize: 18,
         ),
       ),
-      subtitle: Row(
-        children: [
-          Text(
-            dayLabel,
-            style: TextStyle(color: isDone ? Colors.grey : Colors.black54),
-          ),
-          const SizedBox(width: 6),
-          const Icon(Icons.access_time, size: 16),
-          const SizedBox(width: 6),
-          Text(timeLabel),
-        ],
-      ),
+      subtitle: Text('${formatDate(dueDate)} • ${formatTime(dueDate)}'),
       trailing: IconButton(
         icon: const Icon(Icons.more_vert),
         onPressed: onEdit, // 👈 call the callback
@@ -433,8 +406,6 @@ String formatDate(DateTime date) {
   return DateFormat('E, MMM d').format(date); // Example: Mon, Feb 12
 }
 
-String formatTime(TimeOfDay time) {
-  final now = DateTime.now();
-  final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+String formatTime(DateTime dt) {
   return DateFormat('h:mm a').format(dt); // 6:30 PM
 }
