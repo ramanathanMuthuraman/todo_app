@@ -104,7 +104,7 @@ class _TodoScreenState extends State<TodoScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            Future<void> _pickDate() async {
+            Future<void> pickDate() async {
               final now = DateTime.now();
               final picked = await showDatePicker(
                 context: context,
@@ -126,7 +126,7 @@ class _TodoScreenState extends State<TodoScreen> {
               }
             }
 
-            Future<void> _pickTime() async {
+            Future<void> pickTime() async {
               final picked = await showTimePicker(
                 context: context,
                 initialTime: TimeOfDay.fromDateTime(tempDueDate),
@@ -177,13 +177,13 @@ class _TodoScreenState extends State<TodoScreen> {
                   Row(
                     children: [
                       OutlinedButton.icon(
-                        onPressed: _pickDate,
+                        onPressed: pickDate,
                         icon: const Icon(Icons.calendar_today, size: 18),
                         label: const Text("Pick date"),
                       ),
                       const SizedBox(width: 12),
                       OutlinedButton.icon(
-                        onPressed: _pickTime,
+                        onPressed: pickTime,
                         icon: const Icon(Icons.access_time, size: 18),
                         label: const Text("Pick time"),
                       ),
@@ -368,6 +368,8 @@ class _TodoListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isOverdue = !isDone && dueDate.isBefore(DateTime.now());
+    final String timeLeft = timeLeftText(dueDate);
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: IconButton(
@@ -381,11 +383,26 @@ class _TodoListItem extends StatelessWidget {
         title,
         style: TextStyle(
           decoration: isDone ? TextDecoration.lineThrough : null,
-          color: isDone ? Colors.grey : Colors.black,
+          color: isDone ? Colors.grey : (isOverdue ? Colors.red : Colors.black),
           fontSize: 18,
         ),
       ),
-      subtitle: Text('${formatDate(dueDate)} • ${formatTime(dueDate)}'),
+      subtitle: Row(
+        children: [
+          Text('${formatDate(dueDate)} • ${formatTime(dueDate)}'),
+          if (!isDone) ...[
+            const SizedBox(width: 8),
+            Text(
+              timeLeft,
+              style: TextStyle(
+                color: isOverdue ? Colors.red : Colors.grey,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
+      ),
+
       trailing: IconButton(
         icon: const Icon(Icons.more_vert),
         onPressed: onEdit, // 👈 call the callback
@@ -408,4 +425,24 @@ String formatDate(DateTime date) {
 
 String formatTime(DateTime dt) {
   return DateFormat('h:mm a').format(dt); // 6:30 PM
+}
+
+String timeLeftText(DateTime due) {
+  final now = DateTime.now();
+  final diff = due.difference(now);
+
+  if (diff.inSeconds.abs() < 60) return diff.isNegative ? 'overdue' : 'now';
+
+  // If overdue
+  if (diff.isNegative) {
+    final h = diff.inHours.abs();
+    final m = diff.inMinutes.abs() % 60;
+    if (h > 0) return 'overdue ${h}h ${m}m';
+    return 'overdue ${m}m';
+  }
+
+  // If upcoming
+  if (diff.inDays >= 1) return 'in ${diff.inDays}d';
+  if (diff.inHours >= 1) return 'in ${diff.inHours}h';
+  return 'in ${diff.inMinutes}m';
 }
