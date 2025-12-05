@@ -386,54 +386,72 @@ class _TodoScreenState extends State<TodoScreen> {
                 ],
               ),
               Expanded(
-                child: ListView.builder(
-                  itemCount: list.length,
-                  itemBuilder: (context, index) {
-                    final item = list[index];
-                    return Dismissible(
-                      key: ValueKey(item.title), // ok for now
-                      direction:
-                          DismissDirection.endToStart, // swipe right → left
-                      onDismissed: (direction) async {
-                        // store title before removing
-                        final removedTitle = item.title;
-
-                        setState(() {
-                          _todos.removeAt(index);
-                          _applyFilters();
-                        });
-                        await _saveTodos();
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('$removedTitle deleted')),
-                        );
-                      },
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        color: Colors.red,
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      child: _TodoListItem(
-                        key: ValueKey(
-                          '${item.title}_${item.dueDate.toIso8601String()}',
+                child: list.isEmpty
+                    ? Center(
+                        child: Text(
+                          (_todos.isEmpty &&
+                                  _searchController.text.trim().isEmpty &&
+                                  _filter == FilterType.all)
+                              ? 'No tasks yet. Add your first one above!'
+                              : 'No tasks match your search/filter.',
+                          style: const TextStyle(color: Colors.grey),
                         ),
-                        title: item.title,
-                        dueDate: item.dueDate,
-                        isDone: item.isDone,
-                        onEdit: () => _openEditBottomSheet(item),
-                        onToggle: () async {
-                          setState(() {
-                            item.isDone = !item.isDone;
-                            _sortTodos();
-                            _applyFilters();
-                          });
-                          await _saveTodos();
+                      )
+                    : ListView.builder(
+                        itemCount: list.length,
+                        itemBuilder: (context, index) {
+                          final item = list[index];
+                          return Dismissible(
+                            key: ValueKey(item.title), // ok for now
+                            direction: DismissDirection
+                                .endToStart, // swipe right → left
+                            onDismissed: (direction) async {
+                              // store title before removing
+                              final removedTitle = item.title;
+
+                              setState(() {
+                                _todos.removeAt(index);
+                                _applyFilters();
+                              });
+                              await _saveTodos();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('$removedTitle deleted'),
+                                ),
+                              );
+                            },
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              color: Colors.red,
+                              child: const Icon(
+                                Icons.delete,
+                                color: Colors.white,
+                              ),
+                            ),
+                            child: _TodoListItem(
+                              key: ValueKey(
+                                '${item.title}_${item.dueDate.toIso8601String()}',
+                              ),
+                              title: item.title,
+                              dueDate: item.dueDate,
+                              isDone: item.isDone,
+                              onEdit: () => _openEditBottomSheet(item),
+                              onToggle: () async {
+                                setState(() {
+                                  item.isDone = !item.isDone;
+                                  _sortTodos();
+                                  _applyFilters();
+                                });
+                                await _saveTodos();
+                              },
+                            ),
+                          );
                         },
                       ),
-                    );
-                  },
-                ),
               ),
             ],
           ),
