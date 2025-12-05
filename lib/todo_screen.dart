@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+
+enum FilterType { all, pending, completed }
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -37,9 +40,28 @@ class _TodoItem {
 class _TodoScreenState extends State<TodoScreen> {
   final List<_TodoItem> _todos = [];
   final TextEditingController _taskController = TextEditingController();
+
+  final TextEditingController _searchController = TextEditingController();
+
+  List<_TodoItem> _visibleTodos = [];
+
+  Timer? _searchDebounce;
+
+  FilterType _filter = FilterType.all;
+
+  void _onSearchChanged(String text) {
+    _searchDebounce?.cancel();
+
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      _applyFilters();
+    });
+  }
+
   @override
   void dispose() {
     _taskController.dispose();
+    _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -47,6 +69,7 @@ class _TodoScreenState extends State<TodoScreen> {
   void initState() {
     super.initState();
     _loadTodos();
+    _visibleTodos = List.from(_todos);
   }
 
   void _sortTodos() {
@@ -80,6 +103,7 @@ class _TodoScreenState extends State<TodoScreen> {
         ..clear()
         ..addAll(loaded);
       _sortTodos();
+      _applyFilters();
     });
   }
 
@@ -212,6 +236,7 @@ class _TodoScreenState extends State<TodoScreen> {
                             item.title = newText;
                             item.dueDate = tempDueDate;
                             _sortTodos();
+                            _applyFilters();
                           });
 
                           await _saveTodos();
@@ -233,8 +258,47 @@ class _TodoScreenState extends State<TodoScreen> {
     );
   }
 
+  Widget _buildFilterButton(String label, FilterType type) {
+    final bool selected = _filter == type;
+
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: selected ? Colors.blue : Colors.grey[300],
+        foregroundColor: selected ? Colors.white : Colors.black,
+        padding: EdgeInsets.symmetric(horizontal: 16),
+      ),
+      onPressed: () {
+        setState(() {
+          _filter = type;
+        });
+        _applyFilters();
+      },
+      child: Text(label),
+    );
+  }
+
+  void _applyFilters() {
+    final query = _searchController.text.trim().toLowerCase();
+
+    setState(() {
+      _visibleTodos = _todos.where((item) {
+        // Search filter
+        final matchesSearch = item.title.toLowerCase().contains(query);
+
+        // Status filter
+        final matchesFilter =
+            _filter == FilterType.all ||
+            (_filter == FilterType.pending && !item.isDone) ||
+            (_filter == FilterType.completed && item.isDone);
+
+        return matchesSearch && matchesFilter;
+      }).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final list = _visibleTodos;
     return Scaffold(
       appBar: AppBar(title: const Text("My Todos")),
       body: Align(
@@ -285,6 +349,7 @@ class _TodoScreenState extends State<TodoScreen> {
                               _TodoItem(title: text, dueDate: DateTime.now()),
                             );
                             _sortTodos();
+                            _applyFilters();
                           });
 
                           _taskController.clear();
@@ -296,55 +361,78 @@ class _TodoScreenState extends State<TodoScreen> {
                 ),
               ),
 
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: "Search tasks...",
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onChanged: _onSearchChanged, // 👈 new method
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildFilterButton("All", FilterType.all),
+                  SizedBox(width: 8),
+                  _buildFilterButton("Pending", FilterType.pending),
+                  SizedBox(width: 8),
+                  _buildFilterButton("Completed", FilterType.completed),
+                ],
+              ),
               Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: ListView.builder(
-                    itemCount: _todos.length,
-                    itemBuilder: (context, index) {
-                      final item = _todos[index];
-                      return Dismissible(
-                        key: ValueKey(item.title), // ok for now
-                        direction:
-                            DismissDirection.endToStart, // swipe right → left
-                        onDismissed: (direction) async {
-                          // store title before removing
-                          final removedTitle = item.title;
+                child: ListView.builder(
+                  itemCount: list.length,
+                  itemBuilder: (context, index) {
+                    final item = list[index];
+                    return Dismissible(
+                      key: ValueKey(item.title), // ok for now
+                      direction:
+                          DismissDirection.endToStart, // swipe right → left
+                      onDismissed: (direction) async {
+                        // store title before removing
+                        final removedTitle = item.title;
 
+                        setState(() {
+                          _todos.removeAt(index);
+                          _applyFilters();
+                        });
+                        await _saveTodos();
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('$removedTitle deleted')),
+                        );
+                      },
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        color: Colors.red,
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      child: _TodoListItem(
+                        key: ValueKey(
+                          '${item.title}_${item.dueDate.toIso8601String()}',
+                        ),
+                        title: item.title,
+                        dueDate: item.dueDate,
+                        isDone: item.isDone,
+                        onEdit: () => _openEditBottomSheet(item),
+                        onToggle: () async {
                           setState(() {
-                            _todos.removeAt(index);
+                            item.isDone = !item.isDone;
+                            _sortTodos();
+                            _applyFilters();
                           });
                           await _saveTodos();
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('$removedTitle deleted')),
-                          );
                         },
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          color: Colors.red,
-                          child: const Icon(Icons.delete, color: Colors.white),
-                        ),
-                        child: _TodoListItem(
-                          key: ValueKey(
-                            '${item.title}_${item.dueDate.toIso8601String()}',
-                          ),
-                          title: item.title,
-                          dueDate: item.dueDate,
-                          isDone: item.isDone,
-                          onEdit: () => _openEditBottomSheet(item),
-                          onToggle: () async {
-                            setState(() {
-                              item.isDone = !item.isDone;
-                              _sortTodos();
-                            });
-                            await _saveTodos();
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
