@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import 'theme_controller.dart';
 
 enum FilterType { all, pending, completed }
 
@@ -299,162 +300,176 @@ class _TodoScreenState extends State<TodoScreen> {
   @override
   Widget build(BuildContext context) {
     final list = _visibleTodos;
+    final theme = ThemeControllerProvider.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text("My Todos")),
-      body: Align(
-        alignment: Alignment.topLeft,
-
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Row(
-                  children: [
-                    // Text Input Box (takes remaining space)
-                    Expanded(
-                      child: TextField(
-                        controller: _taskController,
-                        decoration: InputDecoration(
-                          hintText: "Add a new task",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Add Button
-                    Container(
-                      margin: EdgeInsets.only(left: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text("My Todos"),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(theme.isDark ? Icons.dark_mode : Icons.light_mode),
+            onPressed: theme.toggle,
+            tooltip: 'Toggle theme',
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1) Add new task row
+            Row(
+              children: [
+                // Text Input Box (takes remaining space)
+                Expanded(
+                  child: TextField(
+                    controller: _taskController,
+                    decoration: InputDecoration(
+                      hintText: "Add a new task",
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: IconButton(
-                        icon: const Icon(Icons.add, color: Colors.white),
-                        onPressed: () async {
-                          final text = _taskController.text.trim();
-                          if (text.isEmpty) return;
-
-                          setState(() {
-                            _todos.add(
-                              _TodoItem(title: text, dueDate: DateTime.now()),
-                            );
-                            _sortTodos();
-                            _applyFilters();
-                          });
-
-                          _taskController.clear();
-                          await _saveTodos();
-                        },
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
                     ),
-                  ],
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: "Search tasks...",
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
                   ),
-                  onChanged: _onSearchChanged, // 👈 new method
                 ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildFilterButton("All", FilterType.all),
-                  SizedBox(width: 8),
-                  _buildFilterButton("Pending", FilterType.pending),
-                  SizedBox(width: 8),
-                  _buildFilterButton("Completed", FilterType.completed),
-                ],
-              ),
-              Expanded(
-                child: list.isEmpty
-                    ? Center(
-                        child: Text(
-                          (_todos.isEmpty &&
-                                  _searchController.text.trim().isEmpty &&
-                                  _filter == FilterType.all)
-                              ? 'No tasks yet. Add your first one above!'
-                              : 'No tasks match your search/filter.',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: list.length,
-                        itemBuilder: (context, index) {
-                          final item = list[index];
-                          return Dismissible(
-                            key: ValueKey(item.title), // ok for now
-                            direction: DismissDirection
-                                .endToStart, // swipe right → left
-                            onDismissed: (direction) async {
-                              // store title before removing
-                              final removedTitle = item.title;
 
+                const SizedBox(width: 10),
+
+                // Add Button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    onPressed: () async {
+                      final text = _taskController.text.trim();
+                      if (text.isEmpty) return;
+
+                      setState(() {
+                        _todos.add(
+                          _TodoItem(title: text, dueDate: DateTime.now()),
+                        );
+                        _sortTodos();
+                        _applyFilters();
+                      });
+
+                      _taskController.clear();
+                      await _saveTodos();
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // 2) Search field
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: "Search tasks...",
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: _onSearchChanged,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // 3) Filter buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildFilterButton("All", FilterType.all),
+                const SizedBox(width: 8),
+                _buildFilterButton("Pending", FilterType.pending),
+                const SizedBox(width: 8),
+                _buildFilterButton("Completed", FilterType.completed),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // 4) List / Empty state — must be Expanded
+            Expanded(
+              child: list.isEmpty
+                  ? Center(
+                      child: Text(
+                        (_todos.isEmpty &&
+                                _searchController.text.trim().isEmpty &&
+                                _filter == FilterType.all)
+                            ? 'No tasks yet. Add your first one above!'
+                            : 'No tasks match your search/filter.',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: list.length,
+                      itemBuilder: (context, index) {
+                        final item = list[index];
+
+                        return Dismissible(
+                          key: ValueKey(
+                            '${item.title}_${item.dueDate.toIso8601String()}',
+                          ),
+                          direction: DismissDirection.endToStart,
+                          onDismissed: (direction) async {
+                            final removedTitle = item.title;
+
+                            setState(() {
+                              _todos.removeAt(index);
+                              _applyFilters();
+                            });
+                            await _saveTodos();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('$removedTitle deleted')),
+                            );
+                          },
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            color: Colors.red,
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
+                          ),
+                          child: _TodoListItem(
+                            key: ValueKey(
+                              '${item.title}_${item.dueDate.toIso8601String()}',
+                            ),
+                            title: item.title,
+                            dueDate: item.dueDate,
+                            isDone: item.isDone,
+                            onEdit: () => _openEditBottomSheet(item),
+                            onToggle: () async {
                               setState(() {
-                                _todos.removeAt(index);
+                                item.isDone = !item.isDone;
+                                _sortTodos();
                                 _applyFilters();
                               });
                               await _saveTodos();
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('$removedTitle deleted'),
-                                ),
-                              );
                             },
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              color: Colors.red,
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                              ),
-                            ),
-                            child: _TodoListItem(
-                              key: ValueKey(
-                                '${item.title}_${item.dueDate.toIso8601String()}',
-                              ),
-                              title: item.title,
-                              dueDate: item.dueDate,
-                              isDone: item.isDone,
-                              onEdit: () => _openEditBottomSheet(item),
-                              onToggle: () async {
-                                setState(() {
-                                  item.isDone = !item.isDone;
-                                  _sortTodos();
-                                  _applyFilters();
-                                });
-                                await _saveTodos();
-                              },
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -493,44 +508,56 @@ class _TodoListItem extends StatelessWidget {
         scale: isDone ? 0.96 : 1.0, // <<-- NEW
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        child: ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: IconButton(
-            icon: Icon(
-              isDone ? Icons.check_box : Icons.check_box_outline_blank,
-              color: Colors.blue,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Card(
+            elevation: 2,
+            color: isDone ? Colors.grey[200] : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            onPressed: onToggle,
-          ),
-          title: Text(
-            title,
-            style: TextStyle(
-              decoration: isDone ? TextDecoration.lineThrough : null,
-              color: isDone
-                  ? Colors.grey
-                  : (isOverdue ? Colors.red : Colors.black),
-              fontSize: 18,
-            ),
-          ),
-          subtitle: Row(
-            children: [
-              Text('${formatDate(dueDate)} • ${formatTime(dueDate)}'),
-              if (!isDone) ...[
-                const SizedBox(width: 8),
-                Text(
-                  timeLeft,
-                  style: TextStyle(
-                    color: isOverdue ? Colors.red : Colors.grey,
-                    fontSize: 12,
-                  ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 4,
+              ),
+              leading: IconButton(
+                icon: Icon(
+                  isDone ? Icons.check_box : Icons.check_box_outline_blank,
+                  color: Colors.blue,
                 ),
-              ],
-            ],
-          ),
-
-          trailing: IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: onEdit, // 👈 call the callback
+                onPressed: onToggle,
+              ),
+              title: Text(
+                title,
+                style: TextStyle(
+                  decoration: isDone ? TextDecoration.lineThrough : null,
+                  color: isDone
+                      ? Colors.grey
+                      : (isOverdue ? Colors.red : Colors.black),
+                  fontSize: 18,
+                ),
+              ),
+              subtitle: Row(
+                children: [
+                  Text('${formatDate(dueDate)} • ${formatTime(dueDate)}'),
+                  if (!isDone) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      timeLeft,
+                      style: TextStyle(
+                        color: isOverdue ? Colors.red : Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.more_vert),
+                onPressed: onEdit,
+              ),
+            ),
           ),
         ),
       ),
