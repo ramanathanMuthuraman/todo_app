@@ -5,6 +5,8 @@ import 'todo/todo_controller.dart';
 import 'todo/filter_button.dart';
 import 'todo/todo_list_item.dart';
 import 'todo/todo_edit_bottom_sheet.dart';
+import 'settings_screen.dart';
+import 'todo_detail_screen.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -43,6 +45,14 @@ class _TodoScreenState extends State<TodoScreen> {
             icon: Icon(theme.isDark ? Icons.dark_mode : Icons.light_mode),
             onPressed: theme.toggle,
             tooltip: 'Toggle theme',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+            },
           ),
         ],
       ),
@@ -192,6 +202,13 @@ class _TodoScreenState extends State<TodoScreen> {
                               await todos.toggleTodo(
                                 item,
                               ); // 👈 controller handles everything
+                            },
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => TodoDetailScreen(todo: item),
+                                ),
+                              );
                             },
                           ),
                         );

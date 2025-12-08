@@ -7,6 +7,7 @@ class TodoListItem extends StatelessWidget {
   final bool isDone;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
+  final VoidCallback? onTap;
 
   const TodoListItem({
     super.key,
@@ -15,6 +16,7 @@ class TodoListItem extends StatelessWidget {
     required this.isDone,
     required this.onToggle,
     required this.onEdit,
+    this.onTap,
   });
 
   @override
@@ -42,6 +44,7 @@ class TodoListItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: ListTile(
+              onTap: onTap,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
                 vertical: 4,

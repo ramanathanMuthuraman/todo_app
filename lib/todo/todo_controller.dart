@@ -38,6 +38,12 @@ class TodoController extends ChangeNotifier {
     _applyFilters();
   }
 
+  Future<void> clearAll() async {
+    _todos.clear();
+    _applyFilters(); // will call notifyListeners()
+    await saveTodos(); // persist the empty list
+  }
+
   // Save all todos
   Future<void> saveTodos() async {
     final prefs = await SharedPreferences.getInstance();
