@@ -148,72 +148,109 @@ class _TodoScreenState extends State<TodoScreen> {
 
             // 4) List / Empty state — must be Expanded
             Expanded(
-              child: list.isEmpty
-                  ? Center(
-                      child: Text(
-                        (todos.todos.isEmpty &&
-                                _searchController.text.trim().isEmpty &&
-                                todos.filter == FilterType.all)
-                            ? 'No tasks yet. Add your first one above!'
-                            : 'No tasks match your search/filter.',
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: list.length,
-                      itemBuilder: (context, index) {
-                        final item = list[index];
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                // use a custom transition: fade + slide
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  final inAnim = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOut,
+                  );
+                  final offsetAnim = Tween<Offset>(
+                    begin: const Offset(0.0, 0.08), // slight slide up on enter
+                    end: Offset.zero,
+                  ).animate(inAnim);
 
-                        return Dismissible(
-                          key: ValueKey(
-                            '${item.title}_${item.dueDate.toIso8601String()}',
-                          ),
-                          direction: DismissDirection.endToStart,
-                          onDismissed: (direction) async {
-                            final removedTitle = item.title;
+                  return FadeTransition(
+                    opacity: inAnim,
+                    child: SlideTransition(position: offsetAnim, child: child),
+                  );
+                },
 
-                            await todos.deleteAt(
-                              index,
-                            ); // 👈 controller handles list + save
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('$removedTitle deleted')),
+                child: list.isEmpty
+                    ? Center(
+                        key: ValueKey(
+                          'empty_${todos.filter}_${_searchController.text.trim()}',
+                        ),
+                        child: Text(
+                          (todos.todos.isEmpty &&
+                                  _searchController.text.trim().isEmpty &&
+                                  todos.filter == FilterType.all)
+                              ? 'No tasks yet. Add your first one above!'
+                              : 'No tasks match your search/filter.',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    : Container(
+                        // Give list its own key derived from filter + query + length to trigger switch
+                        key: ValueKey(
+                          'list_${todos.filter}_${_searchController.text.trim()}',
+                        ),
+                        // Keep same padding as before if desired
+                        child: ListView.builder(
+                          itemCount: list.length,
+                          itemBuilder: (context, index) {
+                            final item = list[index];
+
+                            return Dismissible(
+                              key: ValueKey(
+                                '${item.title}_${item.dueDate.toIso8601String()}',
+                              ),
+                              direction: DismissDirection.endToStart,
+                              onDismissed: (direction) async {
+                                final removedTitle = item.title;
+
+                                await todos.deleteAt(
+                                  index,
+                                ); // 👈 controller handles list + save
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('$removedTitle deleted'),
+                                  ),
+                                );
+                              },
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                color: Colors.red,
+                                child: const Icon(
+                                  Icons.delete,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              child: TodoListItem(
+                                key: ValueKey(
+                                  '${item.title}_${item.dueDate.toIso8601String()}',
+                                ),
+                                title: item.title,
+                                dueDate: item.dueDate,
+                                isDone: item.isDone,
+                                onEdit: () =>
+                                    showEditTodoBottomSheet(context, item),
+                                onToggle: () async {
+                                  await todos.toggleTodo(
+                                    item,
+                                  ); // 👈 controller handles everything
+                                },
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          TodoDetailScreen(todo: item),
+                                    ),
+                                  );
+                                },
+                              ),
                             );
                           },
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            color: Colors.red,
-                            child: const Icon(
-                              Icons.delete,
-                              color: Colors.white,
-                            ),
-                          ),
-                          child: TodoListItem(
-                            key: ValueKey(
-                              '${item.title}_${item.dueDate.toIso8601String()}',
-                            ),
-                            title: item.title,
-                            dueDate: item.dueDate,
-                            isDone: item.isDone,
-                            onEdit: () =>
-                                showEditTodoBottomSheet(context, item),
-                            onToggle: () async {
-                              await todos.toggleTodo(
-                                item,
-                              ); // 👈 controller handles everything
-                            },
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => TodoDetailScreen(todo: item),
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+              ),
             ),
           ],
         ),
