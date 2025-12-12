@@ -3,10 +3,10 @@ import 'dart:async';
 import 'theme_controller.dart';
 import 'todo/todo_controller.dart';
 import 'todo/filter_button.dart';
-import 'todo/todo_list_item.dart';
-import 'todo/todo_edit_bottom_sheet.dart';
 import 'settings_screen.dart';
-import 'todo_detail_screen.dart';
+// import 'todo_detail_screen.dart';
+import 'todo/simple_animated_todo_list.dart';
+import 'todo/todo_item.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -21,6 +21,10 @@ class _TodoScreenState extends State<TodoScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   Timer? _searchDebounce;
+
+  // inside _TodoScreenState
+  final GlobalKey<SimpleAnimatedTodoListState> _simpleListKey =
+      GlobalKey<SimpleAnimatedTodoListState>();
 
   @override
   void dispose() {
@@ -96,7 +100,13 @@ class _TodoScreenState extends State<TodoScreen> {
                       if (text.isEmpty) return;
 
                       await todos.addTodo(text); // 👈 use controller
-
+                      _simpleListKey.currentState?.addItem(
+                        TodoItem(
+                          title: text,
+                          dueDate: DateTime.now(),
+                          isDone: false,
+                        ),
+                      );
                       _taskController.clear();
                     },
                   ),
@@ -188,65 +198,23 @@ class _TodoScreenState extends State<TodoScreen> {
                         key: ValueKey(
                           'list_${todos.filter}_${_searchController.text.trim()}',
                         ),
-                        // Keep same padding as before if desired
-                        child: ListView.builder(
-                          itemCount: list.length,
-                          itemBuilder: (context, index) {
-                            final item = list[index];
+                        child: SimpleAnimatedTodoList(
+                          key: _simpleListKey,
+                          initialItems: todos.visibleTodos,
 
-                            return Dismissible(
-                              key: ValueKey(
-                                '${item.title}_${item.dueDate.toIso8601String()}',
-                              ),
-                              direction: DismissDirection.endToStart,
-                              onDismissed: (direction) async {
-                                final removedTitle = item.title;
-
-                                await todos.deleteAt(
-                                  index,
-                                ); // 👈 controller handles list + save
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('$removedTitle deleted'),
-                                  ),
-                                );
-                              },
-                              background: Container(
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                color: Colors.red,
-                                child: const Icon(
-                                  Icons.delete,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              child: TodoListItem(
-                                key: ValueKey(
-                                  '${item.title}_${item.dueDate.toIso8601String()}',
-                                ),
-                                title: item.title,
-                                dueDate: item.dueDate,
-                                isDone: item.isDone,
-                                onEdit: () =>
-                                    showEditTodoBottomSheet(context, item),
-                                onToggle: () async {
-                                  await todos.toggleTodo(
-                                    item,
-                                  ); // 👈 controller handles everything
-                                },
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          TodoDetailScreen(todo: item),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
+                          onRemove: (removed) async {
+                            // persist deletion using your controller
+                            // find index in controller's visibleTodos if you need it, or call a delete by title/dueDate
+                            await todos.deleteByTitleAndDate(
+                              removed.title,
+                              removed.dueDate,
+                            ); // example — adapt to your API
+                          },
+                          onToggle: (todo) async {
+                            // best if your controller has a toggle method that persists
+                            await todos.toggleTodo(
+                              todo,
+                            ); // implement this in controller if missing
                           },
                         ),
                       ),

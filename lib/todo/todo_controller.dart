@@ -83,6 +83,17 @@ class TodoController extends ChangeNotifier {
     await saveTodos();
   }
 
+  // Find by title + dueDate and delete (async)
+  Future<void> deleteByTitleAndDate(String title, DateTime dueDate) async {
+    // find index in the _todos (master list) that matches title + exact dueDate
+    final idx = _todos.indexWhere(
+      (t) => t.title == title && t.dueDate.isAtSameMomentAs(dueDate),
+    );
+    if (idx == -1) return;
+
+    await deleteAt(idx);
+  }
+
   // Filters
   void setFilter(FilterType type) {
     _filter = type;
