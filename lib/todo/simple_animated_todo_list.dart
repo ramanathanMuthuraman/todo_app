@@ -51,6 +51,17 @@ class SimpleAnimatedTodoListState extends State<SimpleAnimatedTodoList> {
     );
   }
 
+  bool removeItem(TodoItem item) {
+    final index = _items.indexWhere(
+      (t) => t.title == item.title && t.dueDate.isAtSameMomentAs(item.dueDate),
+    );
+
+    if (index == -1) return false;
+
+    removeItemAt(index); // reuse your animation logic
+    return true;
+  }
+
   /// Public method to remove an item programmatically (animates removal).
   /// Returns true if removed.
   bool removeItemAt(int index) {

@@ -209,6 +209,7 @@ class _TodoScreenState extends State<TodoScreen> {
                               removed.title,
                               removed.dueDate,
                             ); // example — adapt to your API
+                            _simpleListKey.currentState?.removeItem(removed);
                           },
                           onToggle: (todo) async {
                             // best if your controller has a toggle method that persists
