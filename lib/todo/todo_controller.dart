@@ -34,7 +34,6 @@ class TodoController extends ChangeNotifier {
       ..clear()
       ..addAll(decoded.map((m) => TodoItem.fromMap(m)));
 
-    _sort();
     _applyFilters();
   }
 
@@ -54,7 +53,7 @@ class TodoController extends ChangeNotifier {
   // Add a new todo
   Future<void> addTodo(String title) async {
     _todos.add(TodoItem(title: title, dueDate: DateTime.now()));
-    _sort();
+
     _applyFilters();
     await saveTodos();
   }
@@ -62,7 +61,7 @@ class TodoController extends ChangeNotifier {
   // Toggle a todo
   Future<void> toggleTodo(TodoItem item) async {
     item.isDone = !item.isDone;
-    _sort();
+
     _applyFilters();
     await saveTodos();
   }
@@ -71,7 +70,7 @@ class TodoController extends ChangeNotifier {
   Future<void> updateTodo(TodoItem item, String title, DateTime dueDate) async {
     item.title = title;
     item.dueDate = dueDate;
-    _sort();
+
     _applyFilters();
     await saveTodos();
   }
@@ -119,16 +118,6 @@ class TodoController extends ChangeNotifier {
     }).toList();
 
     notifyListeners();
-  }
-
-  // Sorting: pending first, then due date
-  void _sort() {
-    _todos.sort((a, b) {
-      if (a.isDone != b.isDone) {
-        return a.isDone ? 1 : -1;
-      }
-      return a.dueDate.compareTo(b.dueDate);
-    });
   }
 }
 
