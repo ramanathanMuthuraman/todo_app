@@ -128,13 +128,8 @@ class TodoDetailScreen extends StatelessWidget {
                   );
 
                   if (confirmed == true) {
-                    final controller = TodoControllerProvider.of(context);
-                    final index = controller.todos.indexOf(todo);
-                    if (index != -1) {
-                      await controller.deleteAt(index);
-                    }
                     if (!context.mounted) return;
-                    Navigator.of(context).pop(); // go back after delete
+                    Navigator.of(context).pop(todo);
                   }
                 },
               ),

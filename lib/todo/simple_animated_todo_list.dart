@@ -148,12 +148,15 @@ class SimpleAnimatedTodoListState extends State<SimpleAnimatedTodoList> {
                 onToggle: () async {
                   await widget.onToggle!(todo);
                 },
-                onTap: () {
-                  Navigator.of(context).push(
+                onTap: () async {
+                  final TodoItem? removed = await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => TodoDetailScreen(todo: todo),
                     ),
                   );
+                  if (removed != null) {
+                    widget.onRemove?.call(removed);
+                  }
                 },
               ),
             ),
