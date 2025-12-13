@@ -22,10 +22,6 @@ class _TodoScreenState extends State<TodoScreen> {
 
   Timer? _searchDebounce;
 
-  // inside _TodoScreenState
-  final GlobalKey<SimpleAnimatedTodoListState> _simpleListKey =
-      GlobalKey<SimpleAnimatedTodoListState>();
-
   @override
   void dispose() {
     _taskController.dispose();
@@ -39,6 +35,7 @@ class _TodoScreenState extends State<TodoScreen> {
     final todos = TodoControllerProvider.of(context); // 👈 get controller
     final list = todos.visibleTodos; // 👈 use controller data
     final theme = ThemeControllerProvider.of(context);
+    final simpleListKey = GlobalKey<SimpleAnimatedTodoListState>();
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -100,7 +97,7 @@ class _TodoScreenState extends State<TodoScreen> {
                       if (text.isEmpty) return;
 
                       await todos.addTodo(text); // 👈 use controller
-                      _simpleListKey.currentState?.addItem(
+                      simpleListKey.currentState?.addItem(
                         TodoItem(
                           title: text,
                           dueDate: DateTime.now(),
@@ -199,7 +196,7 @@ class _TodoScreenState extends State<TodoScreen> {
                           'list_${todos.filter}_${_searchController.text.trim()}',
                         ),
                         child: SimpleAnimatedTodoList(
-                          key: _simpleListKey,
+                          key: simpleListKey,
                           initialItems: todos.visibleTodos,
 
                           onRemove: (removed) async {
@@ -209,7 +206,7 @@ class _TodoScreenState extends State<TodoScreen> {
                               removed.title,
                               removed.dueDate,
                             ); // example — adapt to your API
-                            _simpleListKey.currentState?.removeItem(removed);
+                            simpleListKey.currentState?.removeItem(removed);
                           },
                           onToggle: (todo) async {
                             // best if your controller has a toggle method that persists
