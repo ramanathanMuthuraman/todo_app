@@ -5,6 +5,7 @@ import 'todo_screen.dart'; // your existing file
 import 'todo/todo_controller.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   final themeController = ThemeController();
   await themeController.loadInitialTheme();
 
